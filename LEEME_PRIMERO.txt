@@ -1,0 +1,19 @@
+INVENTARIOS IPSICOL - VERSION WEB FLASK
+
+1. Sube a GitHub TODO el contenido de este paquete.
+   Reemplaza ipsicol.py, requirements.txt y .github/workflows/build.yml.
+2. Actions > Compilar IPSICOL Flask para Windows > Run workflow.
+3. Descarga el artifact INVENTARIOS_IPSICOL-FLASK-Windows-x64.
+4. Extraelo en el computador que sera el servidor.
+5. Copia tu base anterior y su carpeta soportes al disco LOCAL de ese servidor.
+6. Ejecuta INVENTARIOS_IPSICOL.exe, elige la base y crea tu administrador.
+7. Desde ese PC: http://127.0.0.1:5000
+8. Desde otro PC: http://IP-DEL-SERVIDOR:5000
+9. Para Internet: descarga cloudflared oficial y abre INICIAR_TUNEL.bat.
+
+Mantener abiertos el servidor y el tunel. No se necesita Python en los equipos.
+El enlace rapido Cloudflare es temporal. No abra puertos del router.
+Los usuarios entran con contrasena; cree sus cuentas desde Usuarios.
+No suba bases, soportes ni contrasenas a GitHub.
+
+GUIA.md contiene todos los pasos. Puede abrirla con el Bloc de notas.
