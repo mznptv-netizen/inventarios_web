@@ -9,6 +9,7 @@ on:
       - '*.bat'
       - '*.ps1'
       - 'GUIA.md'
+      - 'LEEME_PRIMERO.txt'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -29,10 +30,10 @@ jobs:
         shell: pwsh
     steps:
       - name: Descargar código
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Preparar Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           architecture: x64
@@ -76,11 +77,21 @@ jobs:
           if (!(Test-Path $reportPath)) { throw 'Falta el informe de prueba' }
           $result = Get-Content $reportPath -Raw | ConvertFrom-Json
           if (!$result.ok -or !$result.web -or !$result.http -or !$result.sqlite -or !$result.pdf -or !$result.windows_selector) { throw 'Prueba incompleta' }
-          Copy-Item 'INICIAR_SERVIDOR.bat','INICIAR_TUNEL.bat','CAMBIAR_BASE.bat','RESTABLECER_ADMIN.bat','PERMITIR_RED_LOCAL.ps1','GUIA.md','LEEME_PRIMERO.txt' -Destination dist
+          
+          # Copia segura de archivos auxiliares comprobando su existencia
+          $filesToCopy = @('INICIAR_SERVIDOR.bat', 'INICIAR_TUNEL.bat', 'CAMBIAR_BASE.bat', 'RESTABLECER_ADMIN.bat', 'PERMITIR_RED_LOCAL.ps1', 'GUIA.md', 'LEEME_PRIMERO.txt')
+          foreach ($file in $filesToCopy) {
+            if (Test-Path $file) {
+              Copy-Item $file -Destination dist
+            } else {
+              Write-Warning "El archivo $file no se encontró y se omitió."
+            }
+          }
+
           Get-FileHash 'dist/INVENTARIOS_IPSICOL.exe' -Algorithm SHA256 | Format-List
 
       - name: Publicar ejecutable y guía
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: INVENTARIOS_IPSICOL-FLASK-Windows-x64
           path: dist/*
