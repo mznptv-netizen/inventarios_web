@@ -1,0 +1,33 @@
+name: Compilar Servidor Windows
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Copiar repositorio
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalar dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller -r requirements.txt
+
+    - name: Compilar a Ejecutable (.exe)
+      run: |
+        pyinstaller --noconsole --onefile --name="InventariosIPSICOL" ipsicol.py
+
+    - name: Subir Ejecutable como Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Servidor-Windows-EXE
+        path: dist/InventariosIPSICOL.exe
