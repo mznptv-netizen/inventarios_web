@@ -1,33 +1,89 @@
-name: Compilar Servidor Windows
+name: Compilar IPSICOL Flask para Windows
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+    paths:
+      - 'ipsicol.py'
+      - 'requirements.txt'
+      - '*.bat'
+      - '*.ps1'
+      - 'GUIA.md'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ipsicol-flask-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: windows-latest
-
+    name: Servidor Windows 10/11 de 64 bits
+    runs-on: windows-2022
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
     steps:
-    - name: Copiar repositorio
-      uses: actions/checkout@v4
+      - name: Descargar código
+        uses: actions/checkout@v6
 
-    - name: Configurar Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Preparar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements.txt
 
-    - name: Instalar dependencias
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller -r requirements.txt
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar pip' }
+          python -m pip install -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Fallaron las dependencias' }
 
-    - name: Compilar a Ejecutable (.exe)
-      run: |
-        pyinstaller --noconsole --onefile --name="InventariosIPSICOL" ipsicol.py
+      - name: Verificar lógica y acceso web
+        run: |
+          python -m py_compile ipsicol.py
+          if ($LASTEXITCODE -ne 0) { throw 'Error de sintaxis' }
+          python ipsicol.py --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Fallaron las pruebas' }
 
-    - name: Subir Ejecutable como Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Servidor-Windows-EXE
-        path: dist/InventariosIPSICOL.exe
+      - name: Generar icono integrado
+        run: |
+          python ipsicol.py --export-icons assets
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el icono' }
+
+      - name: Compilar servidor ejecutable
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --console --name INVENTARIOS_IPSICOL --icon assets/caja_envio.ico --collect-data reportlab --add-data "assets/caja_envio.ico;." ipsicol.py
+          if ($LASTEXITCODE -ne 0) { throw 'Falló PyInstaller' }
+          if (!(Test-Path 'dist/INVENTARIOS_IPSICOL.exe')) { throw 'No se encontró el ejecutable' }
+
+      - name: Probar ejecutable con HTTP real, SQLite y PDF
+        run: |
+          $reportPath = Join-Path $env:RUNNER_TEMP 'ipsicol-web-smoke.json'
+          $appProcess = Start-Process -FilePath '.\dist\INVENTARIOS_IPSICOL.exe' -ArgumentList @('--smoke-test', '--report', "`"$reportPath`"") -PassThru
+          if (!$appProcess.WaitForExit(90000)) {
+            $appProcess.Kill()
+            throw 'La prueba del ejecutable superó 90 segundos'
+          }
+          if ($appProcess.ExitCode -ne 0) { throw 'El ejecutable falló' }
+          if (!(Test-Path $reportPath)) { throw 'Falta el informe de prueba' }
+          $result = Get-Content $reportPath -Raw | ConvertFrom-Json
+          if (!$result.ok -or !$result.web -or !$result.http -or !$result.sqlite -or !$result.pdf -or !$result.windows_selector) { throw 'Prueba incompleta' }
+          Copy-Item 'INICIAR_SERVIDOR.bat','INICIAR_TUNEL.bat','CAMBIAR_BASE.bat','RESTABLECER_ADMIN.bat','PERMITIR_RED_LOCAL.ps1','GUIA.md','LEEME_PRIMERO.txt' -Destination dist
+          Get-FileHash 'dist/INVENTARIOS_IPSICOL.exe' -Algorithm SHA256 | Format-List
+
+      - name: Publicar ejecutable y guía
+        uses: actions/upload-artifact@v6
+        with:
+          name: INVENTARIOS_IPSICOL-FLASK-Windows-x64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
